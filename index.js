@@ -11,7 +11,7 @@ import notificationsRouter from './routes/notifications.js'
 import { safeError } from './domain.js'
 
 const app = express()
-const port = Number(process.env.API_PORT || 3001)
+const port = Number(process.env.PORT || 3000)
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url))
 const projectDirectory = path.resolve(currentDirectory, '..')
 const contentSecurityPolicy = {
@@ -124,7 +124,7 @@ async function ensurePermissions() {
   } catch {}
 }
 
-const server = app.listen(port, process.env.API_HOST || '127.0.0.1', () => {
+const server = app.listen(port, process.env.PORT || 3000, () => {
   ensurePermissions()
   console.log(`API lista en http://127.0.0.1:${port}`)
 })
