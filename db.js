@@ -22,9 +22,7 @@ export const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   decimalNumbers: true,
-  ssl: {
-    rejectUnauthorized: false,
-  },
+   ssl: process.env.DB_HOST === 'localhost' ? false : { rejectUnauthorized: false },
 })
 
 export async function withTransaction(work) {
