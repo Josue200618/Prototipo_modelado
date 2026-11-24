@@ -65,6 +65,11 @@
     }
   })
 
+  app.get('/', (_request, response) => {
+  response.json({ mensaje: 'API de Lacombalpalo activa' })
+})
+
+
   app.use('/api/auth', authRouter)
   app.use('/api/modules', modulesRouter)
   app.use('/api/notifications', notificationsRouter)
