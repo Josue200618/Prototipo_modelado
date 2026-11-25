@@ -49,9 +49,9 @@ function canRead(user, key) {
 }
 
 async function getRoles() {
-  const [rows] = await pool.execute(
+  const { rows } = await pool.query(
     `SELECT r.id_role, r.name, r.description, r.status,
-            GROUP_CONCAT(DISTINCT CONCAT(p.module_key, ':', v.action_key) ORDER BY p.module_key, v.action_key SEPARATOR ',') AS permission_codes
+            STRING_AGG(DISTINCT p.module_key || ':' || v.action_key, ',' ORDER BY p.module_key || ':' || v.action_key) AS permission_codes
      FROM roles AS r
      LEFT JOIN role_permissions AS rp ON rp.role_id = r.id_role
      LEFT JOIN permissions AS p ON p.id_permission = rp.permission_id
@@ -61,7 +61,7 @@ async function getRoles() {
   )
   return rows.map((row) => {
     const permissionCodes = row.permission_codes ? row.permission_codes.split(',') : []
-    const moduleAccess = [...new Set(permissionCodes.map((code) => code.split(':')[0]))]
+    const moduleAccess = [...new Set(permissionCodes.map((code) => code.split(':')))]
     const isAll = row.name.toLowerCase() === 'administrador'
       || moduleAccess.length >= Object.keys(moduleSpanishNames).length
       || permissionCodes.includes('*')
@@ -89,7 +89,7 @@ async function getRoles() {
 }
 
 async function getUsers() {
-  const [rows] = await pool.execute(
+  const { rows } = await pool.query(
     `SELECT u.id_user, u.role_id, u.identification_type, u.identification,
             u.first_name, u.second_name, u.first_surname, u.second_surname,
             u.email, u.phone, u.status, r.name AS role_name
@@ -120,15 +120,15 @@ async function getUsers() {
 async function getProducts() {
   let hasInCatalog = false
   try {
-    const [cols] = await pool.execute(
-      `SELECT COUNT(*) AS count FROM information_schema.COLUMNS 
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND COLUMN_NAME = 'in_catalog'`,
+    const { rows: cols } = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM information_schema.columns 
+       WHERE table_schema = current_schema() AND table_name = 'products' AND column_name = 'in_catalog'`,
     )
-    hasInCatalog = cols[0]?.count > 0
+    hasInCatalog = (cols?.count || 0) > 0
   } catch {}
 
   const inCatalogCol = hasInCatalog ? 'p.in_catalog' : '1 AS in_catalog'
-  const [rows] = await pool.execute(
+  const { rows } = await pool.query(
     `SELECT p.id_product, p.name, p.description, p.base_price, p.stock, p.status,
             ${inCatalogCol},
             c.name AS category, pi.image_url
@@ -153,7 +153,7 @@ async function getProducts() {
 }
 
 async function getSuppliers() {
-  const [rows] = await pool.execute(
+  const { rows } = await pool.query(
     `SELECT s.id_supplier, s.document_type, s.document_number, s.name, s.phone, s.email,
             s.department, s.municipality, s.address, s.status,
             sp.product_id, sp.acquisition_cost, sp.minimum_stock, p.name AS product_name,
@@ -194,7 +194,7 @@ async function getSuppliers() {
 }
 
 async function getPurchases() {
-  const [rows] = await pool.execute(
+  const { rows } = await pool.query(
     `SELECT pu.id_purchase, pu.supplier_id, pu.purchase_date, pu.total, pu.status,
             s.name AS supplier_name, pd.product_id, pd.quantity, pd.unit_price,
             p.name AS product_name
@@ -223,8 +223,8 @@ async function getPurchases() {
 }
 
 async function getClients(user) {
-  const clientFilter = user.audience === 'client' ? 'WHERE id_client = ?' : ''
-  const [rows] = await pool.execute(
+  const clientFilter = user.audience === 'client' ? 'WHERE id_client = $1' : ''
+  const { rows } = await pool.query(
     `SELECT id_client, person_type, document_type, document_number, name_or_business_name,
             phone, email, department, municipality, delivery_address, status, created_at
      FROM clients ${clientFilter}
@@ -256,8 +256,8 @@ async function getClients(user) {
 }
 
 async function getOrders(user) {
-  const clientFilter = user.audience === 'client' ? 'WHERE o.client_id = ?' : ''
-  const [rows] = await pool.execute(
+  const clientFilter = user.audience === 'client' ? 'WHERE o.client_id = $1' : ''
+  const { rows } = await pool.query(
     `SELECT o.id_order, o.client_id, o.order_date, o.status, o.total, o.payment_method,
             c.name_or_business_name AS client_name, c.email AS client_email,
             c.department, c.municipality, d.address, d.scheduled_date
@@ -270,8 +270,8 @@ async function getOrders(user) {
   )
   if (!rows.length) return []
   const ids = rows.map((row) => row.id_order)
-  const placeholders = ids.map(() => '?').join(',')
-  const [detailRows] = await pool.execute(
+  const placeholders = ids.map((_, index) => `$${index + 1}`).join(',')
+  const { rows: detailRows } = await pool.query(
     `SELECT od.order_id, od.product_id, od.unit_price, od.quantity, p.name AS product_name
      FROM order_details AS od
      INNER JOIN products AS p ON p.id_product = od.product_id
@@ -333,7 +333,7 @@ async function getOrders(user) {
 }
 
 async function getSales() {
-  const [rows] = await pool.execute(
+  const { rows } = await pool.query(
     `SELECT s.id_sale, s.order_id, s.sale_date, s.payment_method, s.total, s.status,
             o.client_id, c.email AS client_email
      FROM sales AS s
@@ -354,8 +354,8 @@ async function getSales() {
 }
 
 async function getDeliveries(user) {
-  const clientFilter = user.audience === 'client' ? 'WHERE o.client_id = ?' : ''
-  const [rows] = await pool.execute(
+  const clientFilter = user.audience === 'client' ? 'WHERE o.client_id = $1' : ''
+  const { rows } = await pool.query(
     `SELECT d.id_delivery, d.order_id, d.address, d.scheduled_date, d.status,
             o.client_id, c.email AS client_email
      FROM deliveries AS d
@@ -377,8 +377,8 @@ async function getDeliveries(user) {
 }
 
 async function getReviews(user) {
-  const clientFilter = user.audience === 'client' ? 'WHERE r.client_id = ?' : ''
-  const [rows] = await pool.execute(
+  const clientFilter = user.audience === 'client' ? 'WHERE r.client_id = $1' : ''
+  const { rows } = await pool.query(
     `SELECT r.id_review, r.client_id, r.order_id, r.product_id, r.rating, r.comment, r.status,
             r.created_at, c.name_or_business_name AS client_name, c.email AS client_email
      FROM reviews AS r
@@ -405,17 +405,17 @@ async function getReviews(user) {
 async function getCategories() {
   let hasImageCol = false
   try {
-    const [cols] = await pool.execute(
-      `SELECT COUNT(*) AS count FROM information_schema.COLUMNS 
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'product_categories' AND COLUMN_NAME = 'image'`
+    const { rows: cols } = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM information_schema.columns 
+       WHERE table_schema = current_schema() AND table_name = 'product_categories' AND column_name = 'image'`,
     )
-    hasImageCol = cols[0]?.count > 0
+    hasImageCol = (cols[0]?.count || 0) > 0
   } catch {}
 
-  const [rows] = await pool.execute(
+  const { rows } = await pool.query(
     hasImageCol
       ? `SELECT id_category, name, description, image, status FROM product_categories ORDER BY id_category`
-      : `SELECT id_category, name, description, status FROM product_categories ORDER BY id_category`
+      : `SELECT id_category, name, description, status FROM product_categories ORDER BY id_category`,
   )
   return rows.map((row) => ({
     id: formatId('categories', row.id_category),

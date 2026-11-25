@@ -6,7 +6,7 @@ function formatNotification(row) {
     category: row.category,
     message: row.message,
     recipient: row.recipient_type,
-    read: Number(row.is_read) === 1,
+    read: Number(row.is_read) === 1 || row.is_read === true,
     createdAt: row.created_at,
   }
   if (row.client_id) notification.clientId = `CLI-${String(row.client_id).padStart(3, '0')}`
@@ -21,27 +21,24 @@ export async function createNotification({
   message,
   relatedId = null,
 }, executor = pool) {
-  const [result] = await executor.execute(
+  const { rows } = await executor.query(
     `INSERT INTO notifications (recipient_type, client_id, category, message, related_id)
-     VALUES (?, ?, ?, ?, ?)`,
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING *`,
     [recipient, clientId, category, message, relatedId],
-  )
-  const [rows] = await executor.execute(
-    'SELECT * FROM notifications WHERE id_notification = ?',
-    [result.insertId],
   )
   return formatNotification(rows[0])
 }
 
 export async function listNotifications(user) {
-  const [rows] = user.audience === 'client'
-    ? await pool.execute(
+  const { rows } = user.audience === 'client'
+    ? await pool.query(
       `SELECT * FROM notifications
-       WHERE recipient_type = 'client' AND client_id = ?
+       WHERE recipient_type = 'client' AND client_id = $1
        ORDER BY created_at DESC, id_notification DESC`,
       [user.id],
     )
-    : await pool.execute(
+    : await pool.query(
       `SELECT * FROM notifications
        WHERE recipient_type = 'admin'
        ORDER BY created_at DESC, id_notification DESC`,

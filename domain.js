@@ -67,20 +67,20 @@ export function publicClient(client) {
 }
 
 export function safeError(error) {
-  if (error?.code === 'ER_DUP_ENTRY') {
+  if (error?.code === '23505') {
     return Object.assign(new Error('Ya existe un registro con ese correo, documento o nombre.'), { status: 409 })
   }
-  if (error?.code === 'ER_ROW_IS_REFERENCED_2' || error?.code === 'ER_ROW_IS_REFERENCED') {
-    return Object.assign(new Error('No se puede eliminar porque existen registros relacionados.'), { status: 409 })
+  if (error?.code === '23503') {
+    return Object.assign(new Error('No se puede eliminar o guardar porque existen registros relacionados o no válidos.'), { status: 409 })
   }
   if (error?.code === 'ECONNREFUSED') {
-    return Object.assign(new Error('No se pudo conectar a MySQL (127.0.0.1:3306). Asegúrate de que el servicio MySQL esté iniciado en Workbench o XAMPP.'), { status: 503 })
+    return Object.assign(new Error('No se pudo conectar a PostgreSQL. Verifica que el servicio esté activo y las variables de entorno sean correctas.'), { status: 503 })
   }
-  if (error?.code === 'ER_BAD_DB_ERROR') {
-    return Object.assign(new Error(`La base de datos '${process.env.DB_NAME || 'Lacombalpalo'}' no fue encontrada en MySQL. Ejecuta el archivo Lacombalpalo.sql en MySQL Workbench.`), { status: 503 })
+  if (error?.code === '3D000') {
+    return Object.assign(new Error(`La base de datos '${process.env.DB_NAME || 'database_lacombalpalo'}' no fue encontrada en PostgreSQL.`), { status: 503 })
   }
-  if (error?.code === 'ER_ACCESS_DENIED_ERROR') {
-    return Object.assign(new Error('Acceso denegado a MySQL. Verifica el usuario y la contraseña en el archivo .env.'), { status: 503 })
+  if (error?.code === '28P01') {
+    return Object.assign(new Error('Acceso denegado a PostgreSQL. Verifica el usuario y la contraseña en las variables de entorno.'), { status: 503 })
   }
   return error
 }

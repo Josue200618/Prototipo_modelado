@@ -37,7 +37,7 @@ function readHidden(prompt) {
 
 const prompt = readline.createInterface({ input: stdin, output: stdout })
 try {
-  const [roles] = await pool.execute(
+  const { rows: roles } = await pool.query(
     `SELECT id_role FROM roles WHERE name = 'Administrador' AND status = 1 LIMIT 1`,
   )
   if (!roles[0]) throw new Error('No existe un rol activo llamado Administrador. Ejecuta primero el SQL y su migración.')
@@ -58,11 +58,11 @@ try {
   const password = await readHidden('Contraseña (mínimo 8 caracteres): ')
   if (password.length < 8) throw new Error('La contraseña debe tener al menos 8 caracteres.')
   const passwordHash = await bcrypt.hash(password, 12)
-  await pool.execute(
+  await pool.query(
     `INSERT INTO users
       (role_id, identification_type, identification, first_name, second_name,
        first_surname, second_surname, email, phone, password_hash)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
     [
       roles[0].id_role,
       identificationType || null,

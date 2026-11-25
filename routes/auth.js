@@ -58,8 +58,8 @@ router.post('/login', loginLimiter, async (request, response, next) => {
 
   try {
     if (audience === 'client') {
-      const [rows] = await pool.execute(
-        'SELECT id_client, email, password_hash, status FROM clients WHERE email = ? LIMIT 1',
+      const { rows } = await pool.query(
+        'SELECT id_client, email, password_hash, status FROM clients WHERE email = $1 LIMIT 1',
         [email],
       )
       const client = rows[0]
@@ -71,11 +71,11 @@ router.post('/login', loginLimiter, async (request, response, next) => {
       return response.json({ user })
     }
 
-    const [rows] = await pool.execute(
+    const { rows } = await pool.query(
       `SELECT u.id_user, u.password_hash, u.status, r.name AS role_name, r.status AS role_status
        FROM users AS u
        INNER JOIN roles AS r ON r.id_role = u.role_id
-       WHERE u.email = ?
+       WHERE u.email = $1
        LIMIT 1`,
       [email],
     )
@@ -120,11 +120,12 @@ router.post('/register', async (request, response, next) => {
   try {
     const passwordHash = await bcrypt.hash(password, 12)
     const result = await withTransaction(async (connection) => {
-      const [insert] = await connection.execute(
+      const { rows } = await connection.query(
         `INSERT INTO clients
           (person_type, document_type, document_number, name_or_business_name, phone,
            email, department, municipality, delivery_address, password_hash)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         RETURNING id_client`,
         [
           String(input.personType).trim(),
           String(input.documentType).trim(),
@@ -138,7 +139,7 @@ router.post('/register', async (request, response, next) => {
           passwordHash,
         ],
       )
-      const clientId = insert.insertId
+      const clientId = rows[0].id_client
       await createNotification({
         recipient: 'admin',
         category: 'client-registration',

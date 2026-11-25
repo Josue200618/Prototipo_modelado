@@ -2,11 +2,11 @@ import { pool } from '../db.js'
 
 export async function getPrincipal(id, audience) {
   if (audience === 'client') {
-    const [rows] = await pool.execute(
+    const { rows } = await pool.query(
       `SELECT id_client, name_or_business_name, email, status, phone, person_type,
               document_type, document_number, department, municipality, delivery_address
        FROM clients
-       WHERE id_client = ?
+       WHERE id_client = $1
        LIMIT 1`,
       [id],
     )
@@ -36,24 +36,24 @@ export async function getPrincipal(id, audience) {
     }
   }
 
-  const [rows] = await pool.execute(
+  const { rows } = await pool.query(
     `SELECT u.id_user, u.email, u.first_name, u.second_name, u.first_surname,
             u.second_surname, u.status, r.id_role, r.name AS role_name
      FROM users AS u
      INNER JOIN roles AS r ON r.id_role = u.role_id
-     WHERE u.id_user = ?
+     WHERE u.id_user = $1
      LIMIT 1`,
     [id],
   )
   const user = rows[0]
   if (!user) return null
 
-  const [permissionRows] = await pool.execute(
+  const { rows: permissionRows } = await pool.query(
     `SELECT DISTINCT p.module_key, v.action_key
      FROM role_permissions AS rp
      INNER JOIN permissions AS p ON p.id_permission = rp.permission_id
      INNER JOIN privileges AS v ON v.id_privilege = rp.privilege_id
-     WHERE rp.role_id = ?
+     WHERE rp.role_id = $1
      ORDER BY p.module_key, v.action_key`,
     [user.id_role],
   )
