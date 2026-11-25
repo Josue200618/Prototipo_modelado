@@ -5,17 +5,17 @@ export async function sendMail(to, subject, html) {
     throw error
   }
 
-  const response = await fetch('https://brevo.com', {
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
       accept: 'application/json',
-      'api-key': process.env.BREVO_API_KEY,
+      'api-key': process.env.BREVO_API_KEY.trim(),
       'content-type': 'application/json',
     },
     body: JSON.stringify({
       sender: {
         name: process.env.BREVO_SENDER_NAME || 'Lacombalpalo',
-        email: process.env.BREVO_SENDER_EMAIL,
+        email: process.env.BREVO_SENDER_EMAIL.trim(),
       },
       to: [{ email: to }],
       subject,
