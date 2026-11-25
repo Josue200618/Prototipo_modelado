@@ -2,6 +2,8 @@ import bcrypt from 'bcryptjs'
 import { pool, withTransaction } from '../db.js'
 import { formatId, parseId, parsePrice, statusToBoolean } from '../domain.js'
 import { createNotification } from './notificationsService.js'
+import { sendOrderReceiptEmail, sendOrderStatusEmail } from './mailService.js'
+
 
 const badRequest = (message) => Object.assign(new Error(message), { status: 400 })
 const notFound = (message) => Object.assign(new Error(message), { status: 404 })
@@ -803,7 +805,14 @@ export async function changeOrderStatus(displayId, status, user) {
       message: `El estado de tu pedido ${formatId('orders', orderId)} cambió a "${status}".`,
       relatedId: formatId('orders', orderId),
     }, connection)
-    return formatId('orders', orderId)
+    
+        const orderCode = formatId('orders', orderId)
+    sendOrderStatusEmail(order.client_email, order.client_name, orderCode, status).catch((err) => {
+      console.error('No se pudo enviar el correo de cambio de estado:', err.message)
+    })
+
+    return orderCode
+
   })
 }
 export async function createClientOrder(input, user) {
@@ -870,7 +879,7 @@ export async function createClientOrder(input, user) {
       clientName: user.name,
       clientEmail: user.email,
       paymentMethod,
-      paymentStatus: 'Simulado',
+      paymentStatus: 'Registrado',
       items: orderItems.map((item) => ({
         id: formatId('products', item.productId),
         name: item.name,
@@ -893,7 +902,7 @@ export async function createClientOrder(input, user) {
       recipient: 'client',
       clientId: user.id,
       category: 'receipt',
-      message: `El comprobante ${receipt.number} está listo. El envío por correo es simulado en este prototipo.`,
+      message: `El comprobante ${receipt.number} está listo y ha sido enviado a tu correo electrónico (${user.email}).`,
       relatedId: orderCode,
     }, connection)
     await createNotification({
@@ -902,6 +911,10 @@ export async function createClientOrder(input, user) {
       message: `Nuevo pedido ${orderCode} registrado por ${user.name}.`,
       relatedId: orderCode,
     }, connection)
+        sendOrderReceiptEmail(user.email, receipt).catch((err) => {
+      console.error('No se pudo enviar el comprobante por correo:', err.message)
+    })
+
     return {
       id: orderCode,
       clientId: formatId('clients', user.id),
