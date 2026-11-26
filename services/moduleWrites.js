@@ -732,19 +732,20 @@ export async function changeOrderStatus(displayId, status, user) {
   const validStatuses = ['Pedido pendiente', 'Aprobado', 'En producción', 'En reparto', 'Entregado', 'Rechazado']
   if (!validStatuses.includes(status)) throw badRequest('El estado del pedido no es válido.')
   return withTransaction(async (connection) => {
-    const { rows: orderRows } = await connection.query(
-      `SELECT o.id_order, o.client_id, o.total, o.payment_method, o.status,
-              c.name_or_business_name AS client_name, c.email AS client_email, c.delivery_address
-       FROM orders AS o
-       INNER JOIN clients AS c ON c.id_client = o.client_id
-       WHERE o.id_order = $1
-       FOR UPDATE`,
-      [orderId],
-    )
-    const order = orderRows
-    if (!order) throw notFound('El pedido no existe.')
+     const { rows: orderRows } = await connection.query(
+   `SELECT o.id_order, o.client_id, o.total, o.payment_method, o.status,
+           c.name_or_business_name AS client_name, c.email AS client_email, c.delivery_address
+    FROM orders AS o
+    INNER JOIN clients AS c ON c.id_client = o.client_id
+    WHERE o.id_order = $1
+    FOR UPDATE`,
+   [orderId],
+ )
+ const order = orderRows[0]
+ if (!order) throw notFound('El pedido no existe.')
 
-    const { rows: existingSales } = await connection.query('SELECT id_sale FROM sales WHERE order_id = $1 LIMIT 1', [orderId])
+
+      const { rows: existingSales } = await connection.query('SELECT id_sale FROM sales WHERE order_id = $1 LIMIT 1', [orderId])
     if (status === 'Entregado' && !existingSales.length) {
       const { rows: details } = await connection.query(
         'SELECT product_id, quantity FROM order_details WHERE order_id = $1',
@@ -758,9 +759,10 @@ export async function changeOrderStatus(displayId, status, user) {
       await connection.query(
         `INSERT INTO sales (order_id, payment_method, total, status)
          VALUES ($1, $2, $3, 'Pagada y entregada')`,
-        [orderId, order.payment_method || 'Por definir', order.total],
+        [orderId, order.payment_method || 'Por definir', Number(order.total) || 0],
       )
     }
+
 
     await connection.query('UPDATE orders SET status = $1 WHERE id_order = $2', [status, orderId])
     const deliveryStatuses = {
@@ -771,14 +773,16 @@ export async function changeOrderStatus(displayId, status, user) {
       Entregado: 'Entregado',
       Rechazado: 'Rechazado',
     }
-    const { rows: deliveryRows } = await connection.query('SELECT id_delivery FROM deliveries WHERE order_id = $1 LIMIT 1', [orderId])
-    if (deliveryRows) {
-      await connection.query(
-        `UPDATE deliveries SET status = $1, approved_by_user_id = $2
-         WHERE id_delivery = $3`,
-        [deliveryStatuses[status], status === 'Aprobado' && user.audience !== 'client' ? user.id : null, deliveryRows.id_delivery],
-      )
-    } else {
+     const { rows: deliveryRows } = await connection.query('SELECT id_delivery FROM deliveries WHERE order_id = $1 LIMIT 1', [orderId])
+ const delivery = deliveryRows[0]
+ if (delivery) {
+   await connection.query(
+     `UPDATE deliveries SET status = $1, approved_by_user_id = $2
+      WHERE id_delivery = $3`,
+     [deliveryStatuses[status], status === 'Aprobado' && user.audience !== 'client' ? user.id : null, delivery.id_delivery],
+   )
+ }
+ else {
       await connection.query(
         'INSERT INTO deliveries (order_id, address, status, approved_by_user_id) VALUES ($1, $2, $3, $4)',
         [
