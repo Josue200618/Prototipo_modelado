@@ -680,6 +680,8 @@ async function deleteModuleRecord(connection, moduleKey, id) {
   if (!target) throw notFound('Módulo no disponible.')
   const result = await connection.query(`DELETE FROM "${target[0]}" WHERE "${target[1]}" = $1`, [id])
   if (!result.rowCount) throw notFound('El registro no existe.')
+
+    
 }
 export async function removeModuleRecord(moduleKey, displayId) {
   const id = parseId(moduleKey, displayId)
@@ -699,7 +701,7 @@ export async function setModuleStatus(moduleKey, displayId, status) {
   }[moduleKey]
   if (!tableAndId) throw badRequest('Este módulo no tiene estado activo/inactivo.')
   const result = await pool.query(
-    `UPDATE "${tableAndId}" SET status = $1 WHERE "${tableAndId}" = $2`,
+    `UPDATE "${tableAndId[0]}" SET status = $1 WHERE "${tableAndId[1]}" = $2`,
     [active, id],
   )
   if (!result.rowCount) throw notFound('El registro no existe.')
@@ -712,7 +714,7 @@ export async function setModuleStatus(moduleKey, displayId, status) {
     await createNotification({
       recipient: 'admin',
       category: moduleKey === 'roles' ? 'role-status' : 'user-status',
-      message: `${moduleKey === 'roles' ? 'El rol' : 'El usuario'} ${rows?.name || formatId(moduleKey, id)} fue ${active ? 'activado' : 'inactivado'}.`,
+      message: `${moduleKey === 'roles' ? 'El rol' : 'El usuario'} ${rows[0]?.name || formatId(moduleKey, id)} fue ${active ? 'activado' : 'inactivado'}.`,
       relatedId: formatId(moduleKey, id),
     })
   }
