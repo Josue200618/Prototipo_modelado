@@ -454,3 +454,9 @@ export async function listPublicProducts() {
   const products = await getProducts()
   return products.filter((product) => product.status === 'Activo' && product.in_catalog !== false && product.inCatalog !== false)
 }
+
+export async function listPublicCategories() {
+  const categories = await getCategories()
+  return categories.filter((category) => category.status === 'Activo')
+}
+

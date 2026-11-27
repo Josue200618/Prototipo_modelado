@@ -9,6 +9,8 @@ import authRouter from './routes/auth.js'
 import modulesRouter, { getPublicProducts } from './routes/modules.js'
 import notificationsRouter from './routes/notifications.js'
 import { safeError } from './domain.js'
+import { listPublicCategories } from './services/modulesService.js'
+
 
 const app = express()
 const port = Number(process.env.PORT || 3000)
@@ -23,7 +25,7 @@ const contentSecurityPolicy = {
     scriptSrc: ["'self'"],
     styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
     fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
-    imgSrc: ["'self'", 'data:', 'https://images.unsplash.com', 'https://plus.unsplash.com'],
+    imgSrc: ["'self'", 'data:', 'https:', 'http:'],
     connectSrc: ["'self'", 'https://api-colombia.com'],
   },
 }
@@ -64,6 +66,15 @@ app.get('/api/public/products', async (_request, response, next) => {
     next(error)
   }
 })
+
+app.get('/api/public/categories', async (_request, response, next) => {
+  try {
+    response.json(await listPublicCategories())
+  } catch (error) {
+    next(error)
+  }
+})
+
 
 app.get('/', (_request, response) => {
   response.json({ mensaje: 'API de Lacombalpalo activa' })
@@ -111,7 +122,10 @@ async function ensurePermissions() {
        WHERE r.name = 'Administrador' AND p.module_key = 'categories'
        ON CONFLICT DO NOTHING`
     )
-    await pool.query('ALTER TABLE product_categories ADD COLUMN IF NOT EXISTS image VARCHAR(500) NULL')
+    await pool.query('ALTER TABLE product_categories ADD COLUMN IF NOT EXISTS image TEXT NULL')
+    await pool.query('ALTER TABLE product_categories ALTER COLUMN image TYPE TEXT')
+    await pool.query('ALTER TABLE product_images ALTER COLUMN image_url TYPE TEXT')
+
   } catch {}
 }
 

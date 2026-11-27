@@ -153,9 +153,10 @@ async function ensureCategory(connection, category) {
 }
 async function saveCategory(connection, input, id = null) {
   const name = required(input.name, 'El nombre de la categoría')
-  const description = String(input.description || '').trim() || null
-  const image = String(input.image || input.image_url || input.url_imagen || '').trim() || null
+  const description = String(input.description ?? input.descripcion ?? '').trim() || null
+  const image = String(input.image ?? input.image_url ?? input.imageUrl ?? input.imagen ?? input.url_imagen ?? '').trim() || null
   const status = statusNumber(input.status ?? input.estado ?? 1)
+
 
   let hasImageCol = false
   try {
@@ -201,7 +202,7 @@ async function saveCategory(connection, input, id = null) {
 
 async function saveProduct(connection, input, id = null) {
   const name = required(input.name, 'El nombre del producto')
-  const description = required(input.description || name, 'La descripción')
+  const description = required(input.description ?? input.descripcion ?? name, 'La descripción')
   const categoryId = await ensureCategory(connection, input.category)
   const price = numberValue(input.priceValue ?? input.price ?? input.base_price, 'El precio', { minimum: 0.01 })
   const stock = numberValue(input.stock, 'El stock')
@@ -274,6 +275,31 @@ async function saveProduct(connection, input, id = null) {
       )
     }
   }
+
+  const rawImage = input.image ?? input.image_url ?? input.imageUrl ?? input.imagen ?? input.url_imagen
+if (rawImage !== undefined) {
+  const cleanUrl = String(rawImage || '').trim()
+  const { rows: existing } = await connection.query(
+    'SELECT id_image FROM product_images WHERE product_id = $1 AND is_primary = 1 LIMIT 1',
+    [id],
+  )
+  if (cleanUrl) {
+    if (existing[0]) {
+      await connection.query(
+        'UPDATE product_images SET image_url = $1 WHERE id_image = $2',
+        [cleanUrl, existing[0].id_image],
+      )
+    } else {
+      await connection.query(
+        'INSERT INTO product_images (product_id, image_url, is_primary) VALUES ($1, $2, 1)',
+        [id, cleanUrl],
+      )
+    }
+  } else if (existing[0]) {
+    await connection.query('DELETE FROM product_images WHERE id_image = $1', [existing[0].id_image])
+  }
+}
+
 
   return formatId('products', id)
 }

@@ -23,22 +23,46 @@ router.get('/', async (request, response, next) => {
   }
 })
 
-router.post('/orders', requireAudience('client'), async (request, response, next) => {
-  try {
-    response.status(201).json(await createClientOrder(request.body || {}, request.user))
-  } catch (error) {
-    next(error)
+function createWithAudienceOrPermission(moduleKey, clientHandler) {
+  return (request, response, next) => {
+    if (request.user?.audience === 'client') {
+      return clientHandler(request, response, next)
+    }
+    return requireAudience('admin', 'employee')(request, response, () =>
+      requirePermission(moduleKey, 'create')(request, response, async () => {
+        try {
+          const id = await saveModuleRecord(moduleKey, request.body || {}, request.user)
+          response.status(201).json({ id })
+        } catch (error) {
+          next(error)
+        }
+      }),
+    )
   }
-})
+}
 
-router.post('/reviews', requireAudience('client'), async (request, response, next) => {
-  try {
-    const id = await saveModuleRecord('reviews', request.body || {}, request.user)
-    response.status(201).json({ id })
-  } catch (error) {
-    next(error)
-  }
-})
+router.post(
+  '/orders',
+  createWithAudienceOrPermission('orders', async (request, response, next) => {
+    try {
+      response.status(201).json(await createClientOrder(request.body || {}, request.user))
+    } catch (error) {
+      next(error)
+    }
+  }),
+)
+
+router.post(
+  '/reviews',
+  createWithAudienceOrPermission('reviews', async (request, response, next) => {
+    try {
+      const id = await saveModuleRecord('reviews', request.body || {}, request.user)
+      response.status(201).json({ id })
+    } catch (error) {
+      next(error)
+    }
+  }),
+)
 
 router.put('/clients/:id', requireAudience('admin', 'employee', 'client'), async (request, response, next) => {
   if (request.user.audience !== 'client' && !request.user.permissionCodes.includes('*') && !request.user.permissionCodes.includes('clients:update')) {
